@@ -61,19 +61,25 @@ jobs:
         RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
       run: |
         # Deploy using RunPod API
-        curl -X POST "https://api.runpod.io/v2/serverless/deploy" \
+        response=$(curl -s -X POST "https://api.runpod.ai/v2/endpoints" \
           -H "Authorization: Bearer ${RUNPOD_API_KEY}" \
           -H "Content-Type: application/json" \
           -d '{
-            "name": "video-captioner-vllm",
-            "image": "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}",
-            "gpuType": "RTX_5090",
-            "minWorkers": 0,
-            "maxWorkers": 3,
-            "env": {
-              "MODEL_NAME": "llava-hf/llava-v1.6-mistral-7b-hf"
-            }
-          }'
+            "name": "video-captioner",
+            "template": {
+              "containerDiskInGb": 20,
+              "dockerArgs": "",
+              "env": [
+                {"key": "MODEL_NAME", "value": "llava-hf/llava-v1.6-mistral-7b-hf"}
+              ],
+              "imageName": "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}",
+              "volumeInGb": 0
+            },
+            "workersMax": 3,
+            "workersMin": 0,
+            "gpuIds": "NVIDIA RTX 5090"
+          }')
+        echo "Deployment response: $response"
     
     - name: Create deployment summary
       if: github.event_name == 'push'
