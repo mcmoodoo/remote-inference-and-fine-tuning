@@ -18,3 +18,6 @@ create-pod:
 
 destroy-pod:
     runpodctl remove pod $(just get-running-pod-id)
+
+download-video-files-from-s3:
+    wget https://mcmoodoo.s3.us-east-1.amazonaws.com/office.MOV
