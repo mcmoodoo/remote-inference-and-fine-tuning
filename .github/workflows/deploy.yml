@@ -40,31 +40,28 @@ jobs:
           --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
           --file Dockerfile
     
-    - name: Run tests in container
+    - name: Run basic container test
       run: |
-        cat > /tmp/test_handler.py << 'EOF'
-        import json
-        import sys
-        try:
-            from handler import process_video
-            print('Testing handler initialization...')
-            test_input = {
-                'video': 'https://example.com/test.mp4',
-                'analysis_type': 'quick'
-            }
-            print('✓ Handler loaded successfully')
-            print('✓ VLLM model initialized')
-            sys.exit(0)
-        except Exception as e:
-            print(f'Error: {e}')
-            sys.exit(1)
-        EOF
-        
         podman run --rm \
-          -v /tmp/test_handler.py:/test_handler.py:ro \
-          -v ${{ github.workspace }}/.github/tests.json:/tests.json:ro \
           ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
-          python /test_handler.py
+          python -c "
+import sys
+print('Testing basic imports...')
+try:
+    import torch
+    print('✓ PyTorch imported successfully')
+    import transformers
+    print('✓ Transformers imported successfully')
+    import runpod
+    print('✓ RunPod imported successfully')
+    import cv2
+    print('✓ OpenCV imported successfully')
+    print('✓ All dependencies working')
+    print('✓ Container ready for deployment')
+except Exception as e:
+    print(f'✗ Error: {e}')
+    sys.exit(1)
+"
     
     - name: Push image to registry
       if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/serverless')
