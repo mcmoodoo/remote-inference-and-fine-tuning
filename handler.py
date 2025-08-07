@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-RunPod Serverless Handler for Video Captioning with VLLM
+RunPod Serverless Handler for Video Captioning with LLaVA
 """
 
 import runpod
@@ -8,33 +8,27 @@ import cv2
 import base64
 import numpy as np
 from PIL import Image
-from io import BytesIO
 import tempfile
 import os
 import requests
 from pathlib import Path
 from typing import Dict, Any, List, Tuple
-from vllm import LLM, SamplingParams
-from vllm.multimodal.image import ImagePixelData
+import torch
+from transformers import LlavaNextProcessor, LlavaNextForConditionalGeneration
 
-# Initialize VLLM model globally for reuse across requests
-print("Initializing VLLM model...")
+# Initialize model globally for reuse across requests
+print("Loading LLaVA model...")
 MODEL_NAME = os.environ.get("MODEL_NAME", "llava-hf/llava-v1.6-mistral-7b-hf")
 
-llm = LLM(
-    model=MODEL_NAME,
-    max_model_len=4096,
-    gpu_memory_utilization=0.9,
-    trust_remote_code=True
+device = "cuda" if torch.cuda.is_available() else "cpu"
+processor = LlavaNextProcessor.from_pretrained(MODEL_NAME)
+model = LlavaNextForConditionalGeneration.from_pretrained(
+    MODEL_NAME,
+    torch_dtype=torch.float16 if device == "cuda" else torch.float32,
+    device_map="auto"
 )
 
-sampling_params = SamplingParams(
-    temperature=0.7,
-    top_p=0.95,
-    max_tokens=512
-)
-
-print(f"Model {MODEL_NAME} loaded successfully")
+print(f"Model {MODEL_NAME} loaded successfully on {device}")
 
 
 def download_video(video_url: str) -> str:
@@ -78,29 +72,47 @@ def extract_frames_uniform(video_path: str, num_frames: int = 8) -> Tuple[List[I
     return frames, frame_times
 
 
-def generate_description(frames: List[Image.Image], prompt: str) -> str:
-    """Generate description using VLLM."""
-    # Format prompt with image placeholders
-    image_prompt = ""
-    for i in range(len(frames)):
-        image_prompt += f"<image_{i}>"
+def generate_caption(frames: List[Image.Image], prompt: str) -> str:
+    """Generate caption using LLaVA model."""
+    # Prepare conversation prompt
+    conversation = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": prompt},
+            ] + [{"type": "image"} for _ in frames]
+        },
+    ]
     
-    full_prompt = f"{image_prompt}\n{prompt}"
+    # Format prompt
+    text = processor.apply_chat_template(conversation, add_generation_prompt=True)
     
-    # Convert PIL images to format VLLM expects
-    image_data = []
-    for frame in frames:
-        img_array = np.array(frame)
-        image_data.append(ImagePixelData(img_array))
+    # Process inputs
+    inputs = processor(
+        text=text,
+        images=frames,
+        return_tensors="pt"
+    ).to(device)
     
-    # Generate with VLLM
-    outputs = llm.generate(
-        prompts=[full_prompt],
-        multi_modal_data={"image": image_data},
-        sampling_params=sampling_params
-    )
+    # Generate caption
+    with torch.no_grad():
+        output = model.generate(
+            **inputs,
+            max_new_tokens=512,
+            do_sample=True,
+            temperature=0.7
+        )
     
-    return outputs[0].outputs[0].text
+    # Decode output
+    generated_text = processor.decode(output[0], skip_special_tokens=True)
+    
+    # Extract only the assistant's response
+    if "assistant" in generated_text:
+        response = generated_text.split("assistant")[-1].strip()
+    else:
+        response = generated_text.split(prompt)[-1].strip()
+    
+    return response
 
 
 def process_video(video_source: str, num_frames: int = 8, analysis_type: str = "comprehensive") -> Dict[str, Any]:
@@ -139,29 +151,29 @@ def process_video(video_source: str, num_frames: int = 8, analysis_type: str = "
                 "frame_timestamps": frame_times
             },
             "model": MODEL_NAME,
+            "device": device,
             "status": "completed"
         }
         
         if analysis_type == "comprehensive":
             # Generate multiple analyses
-            overall = generate_description(
+            overall = generate_caption(
                 frames,
-                "You are analyzing multiple frames from a video in chronological order. "
+                "These are frames from a video shown in chronological order. "
                 "Describe what happens in this video from beginning to end. "
-                "Focus on the main subjects, actions, movements, and how the scene progresses over time."
+                "Focus on the main subjects, actions, and how the scene progresses."
             )
             
-            temporal = generate_description(
+            temporal = generate_caption(
                 frames,
-                "These frames are from a video shown in chronological order. "
-                "Describe the specific changes and movements between frames. "
-                "What actions occur? How do things move or change throughout the video?"
+                "Analyze these video frames and describe the specific changes and movements between frames. "
+                "What actions occur? How do things move or change throughout?"
             )
             
-            scene = generate_description(
+            scene = generate_caption(
                 frames[:3],
                 "Describe the setting, environment, and context of this video. "
-                "Where does it take place? What objects are visible? What's the mood or atmosphere?"
+                "Where does it take place? What's the mood or atmosphere?"
             )
             
             results["analysis"] = {
@@ -171,28 +183,26 @@ def process_video(video_source: str, num_frames: int = 8, analysis_type: str = "
             }
             
         elif analysis_type == "quick":
-            # Single quick analysis
-            description = generate_description(
+            description = generate_caption(
                 frames,
-                "Analyze these video frames and provide a concise description of what happens in the video."
+                "Provide a concise description of what happens in this video."
             )
             results["analysis"] = {
                 "description": description
             }
             
         elif analysis_type == "action":
-            # Focus on actions and movements
-            description = generate_description(
+            description = generate_caption(
                 frames,
-                "Focus on identifying and describing all actions, movements, and activities happening in this video."
+                "Focus on identifying all actions, movements, and activities in this video."
             )
             results["analysis"] = {
                 "action_description": description
             }
             
         else:
-            # Custom prompt provided
-            description = generate_description(frames, analysis_type)
+            # Custom prompt
+            description = generate_caption(frames, analysis_type)
             results["analysis"] = {
                 "custom_description": description
             }

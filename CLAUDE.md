@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a video captioning and analysis system using vision-language models (VLLMs) for automated video understanding. The project uses VLLM for high-performance inference on GPU infrastructure, with two deployment modes:
+This is a lean video captioning and analysis system using LLaVA (Large Language and Vision Assistant) for automated video understanding. The project uses direct PyTorch/Transformers integration for efficient inference on GPU infrastructure, with two deployment modes:
 1. **Pod-based deployment**: Traditional GPU pods for development and testing
 2. **Serverless deployment**: Auto-scaling serverless workers deployed via GitHub Actions
 
@@ -68,7 +68,7 @@ python video_captioner_vllm.py <video_file> --offline
 ### Development Setup
 ```bash
 # Install dependencies
-pip install transformers torch pillow opencv-python accelerate vllm
+pip install transformers torch pillow opencv-python accelerate runpod
 ```
 
 ## Architecture and Code Structure
@@ -77,29 +77,28 @@ pip install transformers torch pillow opencv-python accelerate vllm
 The system supports multiple deployment and execution strategies:
 
 #### Serverless Architecture (Production)
-- **handler.py**: RunPod serverless handler that processes video analysis requests
-- **Dockerfile**: Container image with VLLM and dependencies using Podman
+- **handler.py**: RunPod serverless handler using direct LLaVA model integration
+- **Dockerfile**: Lean container image with PyTorch/Transformers using Podman
 - **GitHub Actions**: Automated CI/CD pipeline for building and deploying to RunPod
 - Supports multiple analysis types: comprehensive, quick, action-focused, or custom
 
-#### Local Execution Modes
-1. **Server Mode** (`VLLMVideoCaptioner`): Communicates with VLLM server via OpenAI-compatible API on localhost:8000
-2. **Offline Mode** (`VLLMOfflineVideoCaptioner`): Direct VLLM integration without server dependency
+#### Local Development
+- **video_captioner_vllm.py**: Standalone application for local testing and development
+- Uses same core LLaVA model as serverless deployment for consistency
 
 ### Key Components
 
 **Serverless Components**:
-- `handler.py`: RunPod serverless worker handler with video processing logic
-- `Dockerfile`: Container definition using Podman for serverless deployment
+- `handler.py`: Lean RunPod serverless handler with direct LLaVA integration
+- `Dockerfile`: Optimized container using PyTorch/Transformers (no VLLM overhead)
 - `.github/workflows/deploy.yml`: GitHub Actions CI/CD pipeline
 - `.github/tests.json`: Test cases for automated validation
-- `requirements.txt`: Python dependencies for serverless environment
+- `requirements.txt`: Minimal Python dependencies
 
 **Local Development Components**:
 - `video_captioner_vllm.py`: Standalone application for local testing
 - `extract_frames_uniform()`: Samples frames uniformly across video timeline
-- `VLLMVideoCaptioner`: Server-based inference using HTTP API
-- `VLLMOfflineVideoCaptioner`: Direct VLLM inference without server
+- Direct model loading using Transformers library
 
 **Infrastructure Files**:
 - `Justfile`: Automation for both pod-based and serverless deployments
@@ -113,10 +112,10 @@ The system supports multiple deployment and execution strategies:
 
 ### Key Technical Considerations
 
-1. **GPU Memory Management**: Uses `--gpu-memory-utilization 0.9` for optimal VLLM performance
-2. **Frame Extraction**: Uniform temporal sampling for consistent video representation
-3. **Base64 Encoding**: Images encoded for API compatibility in server mode
-4. **Model**: Uses `llava-hf/llava-v1.6-mistral-7b-hf` vision-language model
+1. **Direct Model Loading**: Uses PyTorch/Transformers for efficient memory usage
+2. **Frame Extraction**: Uniform temporal sampling for consistent video representation  
+3. **Model**: Uses `llava-hf/llava-v1.6-mistral-7b-hf` vision-language model
+4. **GPU Optimization**: Automatic device mapping and FP16 inference on GPU
 5. **SSH Authentication**: Requires `~/.ssh/runpod_ed25519` key for pod access
 
 ### Development Workflows
@@ -151,4 +150,5 @@ The system supports multiple deployment and execution strategies:
   - `RUNPOD_API_KEY`: For deploying to RunPod
   - `GITHUB_TOKEN`: Automatically provided for registry access
 - **Serverless Benefits**: Auto-scaling, pay-per-use, no idle costs
-- Recent migration from Video-LLaVA to VLLM for performance improvements
+- **Lean Architecture**: Direct PyTorch/Transformers integration without VLLM overhead
+- Recent optimization: Removed VLLM dependency for simpler, more efficient deployment

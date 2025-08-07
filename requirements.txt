@@ -1,13 +1,9 @@
-# Core dependencies
+# Lean dependencies for video captioning
 runpod>=1.0.0
 opencv-python>=4.8.0
 pillow>=10.0.0
 numpy>=1.24.0
 requests>=2.31.0
-
-# Vision-Language Model dependencies
 transformers>=4.36.0
 torch>=2.1.0
 accelerate>=0.25.0
-
-# Note: VLLM is installed separately in Dockerfile with CUDA-specific version
