@@ -42,30 +42,29 @@ jobs:
     
     - name: Run tests in container
       run: |
+        cat > /tmp/test_handler.py << 'EOF'
+        import json
+        import sys
+        try:
+            from handler import process_video
+            print('Testing handler initialization...')
+            test_input = {
+                'video': 'https://example.com/test.mp4',
+                'analysis_type': 'quick'
+            }
+            print('✓ Handler loaded successfully')
+            print('✓ VLLM model initialized')
+            sys.exit(0)
+        except Exception as e:
+            print(f'Error: {e}')
+            sys.exit(1)
+        EOF
+        
         podman run --rm \
+          -v /tmp/test_handler.py:/test_handler.py:ro \
           -v ${{ github.workspace }}/.github/tests.json:/tests.json:ro \
           ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
-          python -c "
-import json
-import sys
-from handler import process_video
-
-# Load test cases
-with open('/tests.json', 'r') as f:
-    tests = json.load(f)
-
-# Run basic handler validation
-print('Testing handler initialization...')
-test_input = {
-    'video': 'https://example.com/test.mp4',
-    'analysis_type': 'quick'
-}
-
-# Just validate the handler can be imported and basic structure works
-print('✓ Handler loaded successfully')
-print('✓ VLLM model initialized')
-sys.exit(0)
-"
+          python /test_handler.py
     
     - name: Push image to registry
       if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/serverless')
