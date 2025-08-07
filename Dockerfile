@@ -13,9 +13,12 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /workspace
 
-# Install PyTorch and core dependencies
+# Install PyTorch with CUDA support
 RUN pip3 install --no-cache-dir \
-    torch torchvision --index-url https://download.pytorch.org/whl/cu121 \
+    torch torchvision --extra-index-url https://download.pytorch.org/whl/cu121
+
+# Install other dependencies
+RUN pip3 install --no-cache-dir \
     transformers>=4.36.0 \
     accelerate>=0.25.0 \
     runpod>=1.0.0 \
