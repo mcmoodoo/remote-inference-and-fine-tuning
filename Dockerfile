@@ -1,31 +1,25 @@
-# Lean Docker image for video captioning with LLaVA
-FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
+# Use PyTorch official image with CUDA support (smaller and pre-optimized)
+FROM pytorch/pytorch:2.1.0-cuda12.1-cudnn8-runtime
 
-# Install Python and system dependencies
+# Install system dependencies for video processing
 RUN apt-get update && apt-get install -y \
-    python3.10 \
-    python3-pip \
     ffmpeg \
     libsm6 \
     libxext6 \
     libgl1-mesa-glx \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
 WORKDIR /workspace
 
-# Install PyTorch with CUDA support
-RUN pip3 install --no-cache-dir \
-    torch torchvision --extra-index-url https://download.pytorch.org/whl/cu121
-
-# Install other dependencies
-RUN pip3 install --no-cache-dir \
+# Install additional Python dependencies (PyTorch already included)
+RUN pip install --no-cache-dir \
     transformers>=4.36.0 \
     accelerate>=0.25.0 \
     runpod>=1.0.0 \
     opencv-python>=4.8.0 \
-    pillow>=10.0.0 \
-    numpy>=1.24.0 \
-    requests>=2.31.0
+    requests>=2.31.0 \
+    && pip cache purge
 
 # Copy application files
 COPY handler.py .
@@ -34,10 +28,12 @@ COPY handler.py .
 ENV PYTHONUNBUFFERED=1
 ENV MODEL_NAME="llava-hf/llava-v1.6-mistral-7b-hf"
 ENV HF_HOME=/workspace/.cache/huggingface
+ENV TORCH_HOME=/workspace/.cache/torch
 
-# Pre-download model components
-RUN python3 -c "from transformers import LlavaNextProcessor, LlavaNextForConditionalGeneration; \
+# Pre-download model processor only (model will be downloaded at runtime)
+RUN python -c "from transformers import LlavaNextProcessor; \
     LlavaNextProcessor.from_pretrained('${MODEL_NAME}'); \
-    print('Model downloaded successfully')"
+    print('Processor downloaded successfully')" \
+    && rm -rf ~/.cache/pip
 
-CMD ["python3", "-u", "handler.py"]
+CMD ["python", "-u", "handler.py"]
