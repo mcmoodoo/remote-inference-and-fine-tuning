@@ -21,3 +21,99 @@ destroy-pod:
 
 download-video-files-from-s3:
     wget https://mcmoodoo.s3.us-east-1.amazonaws.com/office.MOV
+
+# ===== SERVERLESS DEPLOYMENT =====
+
+# Build container image with Podman
+build-serverless:
+    podman build -t video-captioner-serverless:latest .
+
+# Test container locally with Podman
+test-serverless-local:
+    podman run --rm -it \
+        --gpus all \
+        -e MODEL_NAME="llava-hf/llava-v1.6-mistral-7b-hf" \
+        -p 8000:8000 \
+        video-captioner-serverless:latest
+
+# Push to GitHub Container Registry
+push-to-ghcr tag="latest":
+    #!/usr/bin/env bash
+    REPO_OWNER=$(git remote get-url origin | sed 's/.*github.com[:/]\(.*\)\/\(.*\)\.git/\1/' | tr '[:upper:]' '[:lower:]')
+    REPO_NAME=$(basename $(git rev-parse --show-toplevel))
+    IMAGE_NAME="ghcr.io/${REPO_OWNER}/${REPO_NAME}"
+    
+    echo "Building and pushing ${IMAGE_NAME}:{{tag}}"
+    podman build -t ${IMAGE_NAME}:{{tag}} .
+    podman push ${IMAGE_NAME}:{{tag}}
+
+# Deploy to RunPod serverless via API
+deploy-serverless endpoint_name="video-captioner":
+    #!/usr/bin/env bash
+    if [ -z "${RUNPOD_API_KEY}" ]; then
+        echo "Error: RUNPOD_API_KEY environment variable not set"
+        exit 1
+    fi
+    
+    REPO_OWNER=$(git remote get-url origin | sed 's/.*github.com[:/]\(.*\)\/\(.*\)\.git/\1/' | tr '[:upper:]' '[:lower:]')
+    REPO_NAME=$(basename $(git rev-parse --show-toplevel))
+    IMAGE_NAME="ghcr.io/${REPO_OWNER}/${REPO_NAME}:latest"
+    
+    echo "Deploying ${IMAGE_NAME} to RunPod serverless..."
+    
+    curl -X POST "https://api.runpod.io/v2/serverless/deploy" \
+        -H "Authorization: Bearer ${RUNPOD_API_KEY}" \
+        -H "Content-Type: application/json" \
+        -d "{
+            \"name\": \"{{endpoint_name}}\",
+            \"image\": \"${IMAGE_NAME}\",
+            \"gpuType\": \"RTX_5090\",
+            \"minWorkers\": 0,
+            \"maxWorkers\": 3,
+            \"env\": {
+                \"MODEL_NAME\": \"llava-hf/llava-v1.6-mistral-7b-hf\"
+            }
+        }"
+
+# Test serverless endpoint
+test-serverless-endpoint endpoint_id video_url="https://example.com/test.mp4":
+    #!/usr/bin/env bash
+    if [ -z "${RUNPOD_API_KEY}" ]; then
+        echo "Error: RUNPOD_API_KEY environment variable not set"
+        exit 1
+    fi
+    
+    echo "Testing endpoint {{endpoint_id}} with video {{video_url}}"
+    
+    curl -X POST "https://api.runpod.io/v2/{{endpoint_id}}/run" \
+        -H "Authorization: Bearer ${RUNPOD_API_KEY}" \
+        -H "Content-Type: application/json" \
+        -d "{
+            \"input\": {
+                \"video\": \"{{video_url}}\",
+                \"analysis_type\": \"quick\",
+                \"num_frames\": 4
+            }
+        }"
+
+# Check serverless endpoint status
+check-serverless-status endpoint_id:
+    #!/usr/bin/env bash
+    if [ -z "${RUNPOD_API_KEY}" ]; then
+        echo "Error: RUNPOD_API_KEY environment variable not set"
+        exit 1
+    fi
+    
+    curl -X GET "https://api.runpod.io/v2/{{endpoint_id}}/health" \
+        -H "Authorization: Bearer ${RUNPOD_API_KEY}"
+
+# List all serverless endpoints
+list-serverless-endpoints:
+    #!/usr/bin/env bash
+    if [ -z "${RUNPOD_API_KEY}" ]; then
+        echo "Error: RUNPOD_API_KEY environment variable not set"
+        exit 1
+    fi
+    
+    curl -X GET "https://api.runpod.io/v2/serverless/endpoints" \
+        -H "Authorization: Bearer ${RUNPOD_API_KEY}" | jq

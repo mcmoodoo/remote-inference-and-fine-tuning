@@ -1,0 +1,67 @@
+[
+  {
+    "name": "Test basic video processing",
+    "input": {
+      "video": "https://example.com/sample.mp4",
+      "analysis_type": "quick",
+      "num_frames": 4
+    },
+    "expected_output": {
+      "status": "completed"
+    }
+  },
+  {
+    "name": "Test comprehensive analysis",
+    "input": {
+      "video": "https://example.com/sample.mp4",
+      "analysis_type": "comprehensive",
+      "num_frames": 8
+    },
+    "expected_output": {
+      "status": "completed",
+      "analysis": {
+        "overall_description": "*",
+        "temporal_changes": "*",
+        "scene_context": "*"
+      }
+    }
+  },
+  {
+    "name": "Test action-focused analysis",
+    "input": {
+      "video": "https://example.com/sample.mp4",
+      "analysis_type": "action",
+      "num_frames": 6
+    },
+    "expected_output": {
+      "status": "completed",
+      "analysis": {
+        "action_description": "*"
+      }
+    }
+  },
+  {
+    "name": "Test custom prompt",
+    "input": {
+      "video": "https://example.com/sample.mp4",
+      "analysis_type": "Describe only the colors and lighting in this video",
+      "num_frames": 4
+    },
+    "expected_output": {
+      "status": "completed",
+      "analysis": {
+        "custom_description": "*"
+      }
+    }
+  },
+  {
+    "name": "Test error handling - missing video",
+    "input": {
+      "analysis_type": "quick"
+    },
+    "expected_output": {
+      "status": "failed",
+      "error": "*"
+    }
+  }
+]
