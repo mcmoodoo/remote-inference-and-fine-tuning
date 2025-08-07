@@ -1,5 +1,5 @@
 # Use PyTorch official image with CUDA support (smaller and pre-optimized)
-FROM pytorch/pytorch:2.1.0-cuda12.1-cudnn8-runtime
+FROM pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime
 
 # Install system dependencies for video processing
 RUN apt-get update && apt-get install -y \
@@ -12,8 +12,9 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /workspace
 
-# Install additional Python dependencies (PyTorch already included)
+# Fix NumPy compatibility and install dependencies
 RUN pip install --no-cache-dir \
+    "numpy>=2.0,<2.3" \
     transformers>=4.36.0 \
     accelerate>=0.25.0 \
     runpod>=1.0.0 \
