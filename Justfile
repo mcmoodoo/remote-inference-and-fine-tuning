@@ -1,10 +1,17 @@
 default:
     @just --list
 
-# connect to the pod
+# Get running pod ID
+get-running-pod-id:
+    runpodctl get pod | awk 'NR>1 {print $1}'
+
+# Connect to pod via SSH
 connect host:
     ssh {{host}}@ssh.runpod.io -i ~/.ssh/runpod_ed25519
 
-# create a default pod
+# Create a default pod
 create-pod:
     runpodctl create pod --gpuType "NVIDIA GeForce RTX 5090" --imageName runpod/pytorch:2.8.0-py3.11-cuda12.8.1-cudnn-devel-ubuntu22.04 --volumeSize 50 --name shorts-maker --ports 8888/http,22/tcp --startSSH --env "ACCEPT_EULA=true"
+
+destroy-pod:
+    runpodctl remove pod $(just get-running-pod-id)
