@@ -42,26 +42,8 @@ jobs:
     
     - name: Run basic container test
       run: |
-        podman run --rm \
-          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
-          python -c "
-import sys
-print('Testing basic imports...')
-try:
-    import torch
-    print('✓ PyTorch imported successfully')
-    import transformers
-    print('✓ Transformers imported successfully')
-    import runpod
-    print('✓ RunPod imported successfully')
-    import cv2
-    print('✓ OpenCV imported successfully')
-    print('✓ All dependencies working')
-    print('✓ Container ready for deployment')
-except Exception as e:
-    print(f'✗ Error: {e}')
-    sys.exit(1)
-"
+        podman run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+        python -c 'import sys; import torch; import transformers; import runpod; import cv2; print("✓ All dependencies working"); print("✓ Container ready for deployment")'
     
     - name: Push image to registry
       if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/serverless')
